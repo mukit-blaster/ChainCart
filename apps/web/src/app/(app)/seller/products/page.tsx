@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -39,8 +40,10 @@ export default function SellerProductsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="cc-h1">Products</h1>
-        <Button variant="brand" className="rounded-full">
-          <Plus size={16} /> New product
+        <Button asChild variant="brand" className="rounded-full">
+          <Link href="/seller/products/new">
+            <Plus size={16} /> New product
+          </Link>
         </Button>
       </div>
 

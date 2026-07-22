@@ -11,6 +11,8 @@
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-realtime-black?logo=socket.io&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-payments-635BFF?logo=stripe&logoColor=white)
 
+**🔗 Live demo:** [chaincart-ochre.vercel.app](https://chaincart-ochre.vercel.app) — see [Demo accounts](#getting-started) below to sign in. Hosted on free tiers (Vercel + Render + Supabase); the API may take ~50s to wake up on the first request after a period of inactivity.
+
 ![ChainCart home page](<Project%20Images/01-home.png>)
 
 ## Features

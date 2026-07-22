@@ -1,0 +1,55 @@
+# Multi-stage Dockerfile for the ChainCart API.
+#
+# Build context is the repo root. We deliberately swap to the Postgres-native
+# Prisma schema during the build so the running container talks to Postgres
+# (compose) rather than the SQLite file used for local dev.
+
+# ----- Builder -----
+FROM node:20-alpine AS builder
+WORKDIR /repo
+RUN apk add --no-cache openssl
+
+# Copy workspace manifests for cached install
+COPY package.json package-lock.json* ./
+COPY apps/api/package.json apps/api/
+COPY packages/shared/package.json packages/shared/
+RUN npm install --workspaces --include-workspace-root
+
+# Copy sources
+COPY packages/shared packages/shared
+COPY apps/api apps/api
+
+# Activate the Postgres schema for the production image. This overwrites
+# schema.prisma with schema.postgres.prisma so prisma generate emits a client
+# bound to the Postgres types.
+RUN cp apps/api/prisma/schema.postgres.prisma apps/api/prisma/schema.prisma
+
+# Build shared first, then the API. Prisma generate must run against the
+# now-Postgres schema before tsc so types resolve.
+RUN npm --workspace packages/shared run build
+RUN npm --workspace apps/api run prisma:generate
+RUN npm --workspace apps/api run build
+
+# ----- Runtime -----
+FROM node:20-alpine AS runtime
+WORKDIR /app
+RUN apk add --no-cache openssl tini
+
+ENV NODE_ENV=production
+
+COPY --from=builder /repo/node_modules ./node_modules
+COPY --from=builder /repo/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /repo/packages/shared/package.json ./packages/shared/package.json
+COPY --from=builder /repo/apps/api/dist ./apps/api/dist
+COPY --from=builder /repo/apps/api/package.json ./apps/api/
+COPY --from=builder /repo/apps/api/prisma ./apps/api/prisma
+
+EXPOSE 4000
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# `prisma db push` creates tables from the schema on first boot — works on
+# a fresh Postgres without needing a pre-generated migration history. For
+# tightly-controlled production deploys, generate Postgres migrations once
+# (`prisma migrate dev` against a staging DB), commit them, and switch this
+# CMD to `prisma migrate deploy`.
+CMD ["sh", "-c", "npx prisma db push --schema apps/api/prisma/schema.prisma --accept-data-loss && node apps/api/dist/server.js"]

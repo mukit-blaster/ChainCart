@@ -1,0 +1,26 @@
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+.git
+.github
+.env
+**/.env
+**/.env.local
+*.log
+.vscode
+.idea
+coverage
+**/coverage
+
+# Local dev SQLite + migration history — Postgres path is generated fresh.
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal
+apps/api/prisma/migrations
+
+# Hardhat artifacts — re-built per environment.
+packages/contracts/cache
+packages/contracts/artifacts
+packages/contracts/typechain-types

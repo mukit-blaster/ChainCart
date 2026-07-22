@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: chaincart
+          POSTGRES_PASSWORD: chaincart_dev
+          POSTGRES_DB: chaincart
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U chaincart"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://chaincart:chaincart_dev@localhost:5432/chaincart?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-must-be-long-enough
+      JWT_REFRESH_SECRET: ci-refresh-secret-must-be-long-enough
+      CORS_ORIGIN: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm install --workspaces --include-workspace-root
+
+      - name: Build shared package
+        run: npm --workspace packages/shared run build
+
+      - name: Prisma generate
+        run: npm --workspace apps/api run prisma:generate
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build API
+        run: npm --workspace apps/api run build
+
+      - name: Build Web
+        run: npm --workspace apps/web run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        working-directory: packages/contracts
+        run: npm install
+      - name: Compile
+        working-directory: packages/contracts
+        run: npx hardhat compile
+      - name: Test
+        working-directory: packages/contracts
+        run: npx hardhat test

@@ -1,0 +1,45 @@
+# Multi-stage Dockerfile for the ChainCart web app (Next.js 15).
+#
+# NEXT_PUBLIC_* values are inlined at build time, so they must be passed as
+# build args — runtime env vars won't propagate into the static bundle. The
+# defaults below match the local docker compose stack.
+
+# ----- Builder -----
+FROM node:20-alpine AS builder
+WORKDIR /repo
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api
+ARG NEXT_PUBLIC_WS_URL=http://localhost:4000
+ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
+COPY package.json package-lock.json* ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN npm install --workspaces --include-workspace-root
+
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+
+RUN npm --workspace packages/shared run build
+RUN npm --workspace apps/web run build
+
+# ----- Runtime -----
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+COPY --from=builder /repo/apps/web/.next ./apps/web/.next
+COPY --from=builder /repo/apps/web/public ./apps/web/public
+COPY --from=builder /repo/apps/web/package.json ./apps/web/
+COPY --from=builder /repo/apps/web/next.config.mjs ./apps/web/
+COPY --from=builder /repo/node_modules ./node_modules
+COPY --from=builder /repo/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /repo/packages/shared/package.json ./packages/shared/
+
+EXPOSE 3000
+WORKDIR /app/apps/web
+CMD ["npx", "next", "start", "-p", "3000"]

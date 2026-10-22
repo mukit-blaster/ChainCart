@@ -1,0 +1,22 @@
+name: Keep Alive
+
+# Hits a DB-backed endpoint so the Supabase free project never reaches its
+# 7-day inactivity pause. Runs on days 1,4,7,...,31 — never more than 3 days apart.
+on:
+  schedule:
+    - cron: "0 3 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS --max-time 90 "https://chaincart-api.onrender.com/api/products?pageSize=1" -o /dev/null; then
+              echo "OK"; exit 0
+            fi
+            echo "Attempt $i failed, retrying..."; sleep 30
+          done
+          exit 1
